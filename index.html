@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Random Playlist Video</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; padding: 0 1rem; }
+  input { width: 100%; box-sizing: border-box; padding: .5rem; font: inherit; }
+  button { margin-top: .75rem; padding: .5rem 1rem; font: inherit; }
+  .error { color: #c62828; }
+  [hidden] { display: none; }
+</style>
+</head>
+<body>
+<p id="status">Loading…</p>
+
+<form id="key-form" hidden>
+  <label for="key">YouTube Data API key</label>
+  <input id="key" autocomplete="off" required>
+  <button>Save</button>
+  <p><small>Stored in a cookie in this browser only, for one year.</small></p>
+</form>
+
+<form id="list-form" hidden>
+  <label for="list">Playlist ID</label>
+  <input id="list" name="list" placeholder="PL…" required>
+  <button>Go</button>
+</form>
+
+<script>
+"use strict";
+
+const KEY_COOKIE = "yt_api_key";
+const KEY_MAX_AGE = 60 * 60 * 24 * 365;  // seconds
+const CACHE_TTL = 24 * 60 * 60 * 1000;   // ms
+
+const $ = (id) => document.getElementById(id);
+
+function showStatus(text, isError = false) {
+  $("status").textContent = text;
+  $("status").className = isError ? "error" : "";
+}
+
+// --- API key cookie ---
+
+function getKey() {
+  const match = document.cookie.match(new RegExp("(?:^|; )" + KEY_COOKIE + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function saveKey(key) {
+  document.cookie = `${KEY_COOKIE}=${encodeURIComponent(key)}; max-age=${KEY_MAX_AGE}; SameSite=Strict; Secure`;
+}
+
+function clearKey() {
+  document.cookie = `${KEY_COOKIE}=; max-age=0; SameSite=Strict; Secure`;
+}
+
+function askForKey(message) {
+  return new Promise((resolve) => {
+    showStatus(message, message !== "Enter your API key to continue.");
+    $("key-form").hidden = false;
+    $("key").focus();
+    $("key-form").onsubmit = (e) => {
+      e.preventDefault();
+      const key = $("key").value.trim();
+      saveKey(key);
+      $("key-form").hidden = true;
+      showStatus("Loading…");
+      resolve(key);
+    };
+  });
+}
+
+// --- Playlist cache (per-browser convenience; works without it) ---
+
+function readCache(list) {
+  try {
+    const cached = JSON.parse(localStorage.getItem("playlist:" + list));
+    if (cached && Date.now() - cached.time < CACHE_TTL && cached.ids.length) return cached.ids;
+  } catch {}
+  return null;
+}
+
+function writeCache(list, ids) {
+  try { localStorage.setItem("playlist:" + list, JSON.stringify({ time: Date.now(), ids })); } catch {}
+}
+
+// --- YouTube Data API ---
+
+class ApiError extends Error {
+  constructor(message, reason) { super(message); this.reason = reason; }
+}
+
+async function fetchPlaylist(list, key) {
+  const ids = [];
+  let pageToken = "";
+  do {
+    const params = new URLSearchParams({
+      part: "contentDetails,status", playlistId: list, maxResults: "50", key,
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const res = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?" + params);
+    const data = await res.json();
+    if (data.error) {
+      throw new ApiError(data.error.message, data.error.errors?.[0]?.reason ?? data.error.status);
+    }
+    for (const item of data.items) {
+      const privacy = item.status?.privacyStatus;
+      // Deleted videos show up as "privacyStatusUnspecified".
+      if (privacy === "public" || privacy === "unlisted") ids.push(item.contentDetails.videoId);
+    }
+    pageToken = data.nextPageToken ?? "";
+  } while (pageToken);
+  return ids;
+}
+
+// Errors that mean the stored key itself is bad, so we should ask for a new one.
+const KEY_ERRORS = ["keyInvalid", "badRequest", "forbidden", "ipRefererBlocked", "accessNotConfigured", "API_KEY_INVALID"];
+
+async function main() {
+  const list = new URLSearchParams(location.search).get("list");
+  if (!list) {
+    showStatus("Which playlist?");
+    $("list-form").hidden = false;
+    $("list").focus();
+    return;
+  }
+
+  let ids = readCache(list);
+  let key = getKey() ?? await askForKey("Enter your API key to continue.");
+
+  while (!ids) {
+    try {
+      ids = await fetchPlaylist(list, key);
+      if (!ids.length) return showStatus("This playlist has no playable videos.", true);
+      writeCache(list, ids);
+    } catch (err) {
+      if (err instanceof ApiError && err.reason === "playlistNotFound") {
+        return showStatus("Playlist not found. Check the ID, and make sure it's public or unlisted.", true);
+      }
+      if (err instanceof ApiError && KEY_ERRORS.includes(err.reason)) {
+        clearKey();
+        key = await askForKey(`The API key was rejected (${err.message}). Enter a valid key.`);
+        continue;
+      }
+      return showStatus("Couldn't load the playlist: " + err.message, true);
+    }
+  }
+
+  const pick = ids[Math.floor(Math.random() * ids.length)];
+  location.replace(`https://www.youtube.com/watch?v=${pick}&list=${encodeURIComponent(list)}`);
+}
+
+main();
+</script>
+</body>
+</html>

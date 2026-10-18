@@ -23,11 +23,23 @@ describes the same behavior; YouTube has not documented it officially.
 So the bookmarklet needs real video IDs, which means either keeping the hardcoded list or
 fetching the playlist with the YouTube Data API.
 
-### Possible fix: YouTube Data API
+### Fix: `index.html` on GitHub Pages
 
-Calling the API from the bookmarklet itself is unreliable: many sites' Content Security
-Policy blocks the request, and the API key can't be restricted to a referrer. A better
-option is a static page on GitHub Pages, opened from a plain bookmark such as
-`https://<user>.github.io/bookmarklet/?list=<playlist id>`. The page would fetch
-`playlistItems.list` (50 items per request), skip private and deleted videos, cache the IDs
-in `localStorage`, and redirect to `watch?v=<random id>&list=<playlist id>`.
+`index.html` fetches the playlist with the YouTube Data API and opens a random video, so
+nothing needs updating when the playlist changes. Bookmark it as a normal bookmark (not a
+bookmarklet):
+
+```
+https://yunus-tuncbilek.github.io/bookmarklet/?list=<playlist id>
+```
+
+- **API key:** on first visit the page asks for a YouTube Data API key and stores it in a
+  cookie in that browser for one year. The key is never in the repo. If the cookie expires
+  or the API rejects the key, the page asks again.
+- **Caching:** the video IDs are cached in `localStorage` for 24 hours, so most clicks don't
+  call the API. Private and deleted videos are skipped.
+
+Setup:
+1. In Google Cloud Console, enable **YouTube Data API v3** and create an API key. Restrict
+   it to websites `https://yunus-tuncbilek.github.io/*` and to the YouTube Data API v3.
+2. In the repo's **Settings → Pages**, deploy from the `master` branch, `/ (root)` folder.
