@@ -43,3 +43,22 @@ Setup:
 1. In Google Cloud Console, enable **YouTube Data API v3** and create an API key. Restrict
    it to websites `https://yunus-tuncbilek.github.io/*` and to the YouTube Data API v3.
 2. In the repo's **Settings → Pages**, deploy from the `master` branch, `/ (root)` folder.
+
+### iPad/iPhone: why it sometimes opens the YouTube app and sometimes Safari
+
+On iOS, a `youtube.com` link opens the YouTube app through Apple's *universal links*. iOS
+only does this when the user started the navigation by tapping something:
+
+- **First visit:** you tapped **Save** in the API key form, and the redirect followed that
+  tap, so iOS opened the YouTube app.
+- **Later visits:** the key and playlist are already saved, so the page redirects by itself
+  with no tap. iOS treats that as a script redirect and keeps it in Safari.
+
+A second possible cause: if you ever choose to open a YouTube link in Safari instead (e.g. the
+`youtube.com` link at the top right of the YouTube app), iOS remembers that and keeps opening
+`youtube.com` links in Safari. Long-press a YouTube link and choose **Open in "YouTube"** to
+switch it back.
+
+This is an untested explanation based on how universal links behave. If the app is
+preferred, the page could show an **Open video** button instead of redirecting automatically,
+so the tap opens the app.
