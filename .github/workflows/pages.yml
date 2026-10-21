@@ -34,6 +34,7 @@ jobs:
             exit 1
           fi
           mkdir _site
+          cp icon.svg _site/
           sed "s|__YT_API_KEY__|$YT_API_KEY|" index.html > _site/index.html
           grep -q "$YT_API_KEY" _site/index.html
 
