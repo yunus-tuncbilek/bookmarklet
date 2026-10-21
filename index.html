@@ -18,6 +18,8 @@
     font-size: 1.25rem; font-weight: 600; text-align: center;
     text-decoration: none;
   }
+  .hint { color: #c62828; margin: .5rem 0 0; }
+  #bookmark-box { overflow-wrap: anywhere; }
   .error { color: #c62828; }
   [hidden] { display: none; }
 </style>
@@ -28,8 +30,13 @@
 <a id="open" class="open" hidden>Open in YouTube</a>
 
 <form id="list-form" hidden>
-  <label for="list">Playlist ID</label>
-  <input id="list" name="list" placeholder="PL…" required>
+  <label for="list">Playlist link or ID</label>
+  <input id="list" autocomplete="off" required
+    placeholder="Paste a YouTube playlist or video link">
+  <p id="hint" class="hint" hidden></p>
+  <p id="bookmark-box" hidden>
+    Bookmark this link: <a id="bookmark"></a>
+  </p>
   <button>Go</button>
 </form>
 
@@ -110,14 +117,52 @@ async function fetchPlaylist(list) {
   return ids;
 }
 
+// --- Playlist input ---
+
+// Accepts a playlist or video link containing ?list=..., or a bare ID.
+function extractListId(text) {
+  text = text.trim();
+  if (!text) return null;
+  try {
+    const url = new URL(/^[a-z]+:\/\//i.test(text) ? text : "https://" + text);
+    const list = url.searchParams.get("list");
+    if (list) return list;
+  } catch {}
+  return /^[\w-]{10,}$/.test(text) ? text : null;
+}
+
+function bookmarkUrl(list) {
+  return location.origin + location.pathname +
+    "?list=" + encodeURIComponent(list);
+}
+
+function setupForm() {
+  showStatus("Which playlist?");
+  $("list-form").hidden = false;
+  $("list").focus();
+
+  $("list").oninput = () => {
+    const text = $("list").value;
+    const list = extractListId(text);
+    const url = list && bookmarkUrl(list);
+    $("bookmark").href = url || "";
+    $("bookmark").textContent = url || "";
+    $("bookmark-box").hidden = !url;
+    $("hint").textContent = "No playlist ID found in that link.";
+    $("hint").hidden = !text.trim() || !!list;
+  };
+
+  $("list-form").onsubmit = (e) => {
+    e.preventDefault();
+    const list = extractListId($("list").value);
+    if (list) location.href = bookmarkUrl(list);
+    else $("list").oninput();
+  };
+}
+
 async function main() {
   const list = new URLSearchParams(location.search).get("list");
-  if (!list) {
-    showStatus("Which playlist?");
-    $("list-form").hidden = false;
-    $("list").focus();
-    return;
-  }
+  if (!list) return setupForm();
 
   let ids = readCache(list);
   if (!ids) {
