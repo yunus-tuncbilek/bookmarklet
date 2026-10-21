@@ -1,7 +1,22 @@
-# bookmarklet
+# Shufflemark
 
-A small page that picks a random video from a YouTube playlist. Bookmark it as a
-normal bookmark:
+<img src="icon.svg" alt="Shufflemark logo" width="64">
+
+A bookmark that plays a random video from a YouTube playlist. Free and open
+source.
+
+## How to use it (no technical skills needed)
+
+1. Open the Shufflemark page: https://yunus-tuncbilek.github.io/bookmarklet/
+2. In YouTube, open your playlist and copy its link from the address bar (in
+   the YouTube app: Share, then Copy link).
+3. Paste the link into the box on the Shufflemark page. A blue box shows your
+   personal Shufflemark link.
+4. Bookmark that link (Ctrl+D, or ⌘+D on a Mac; on a phone, use the browser's
+   Share or menu button and choose Add Bookmark).
+5. Whenever you open the bookmark, a random video from your playlist starts.
+
+The bookmark looks like this, if you'd rather build it by hand:
 
 ```
 https://yunus-tuncbilek.github.io/bookmarklet/?list=<playlist id>
