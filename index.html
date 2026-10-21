@@ -3,16 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Random Playlist Video</title>
+<title>Shufflemark – Play a random video from any YouTube playlist</title>
+<meta name="description"
+  content="Shufflemark turns any YouTube playlist into a bookmark that plays a random video each time you click it.">
+<meta name="theme-color" content="#c4302b">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <style>
-  :root { color-scheme: light dark; }
+  :root { color-scheme: light dark; --muted: #6b7280; --line: #d1d5db; }
+  @media (prefers-color-scheme: dark) {
+    :root { --muted: #9ca3af; --line: #374151; }
+  }
   body {
     font: 16px/1.5 system-ui, sans-serif;
-    max-width: 32rem; margin: 3rem auto; padding: 0 1rem;
+    max-width: 32rem; margin: 0 auto; padding: 0 1rem;
   }
+  header {
+    display: flex; align-items: center; gap: .75rem; margin: 2rem 0 .5rem;
+  }
+  header img { width: 3rem; height: 3rem; }
+  h1 { margin: 0; font-size: 1.75rem; line-height: 1.1; }
+  .tagline { margin: 0; color: var(--muted); }
+  .steps { padding-left: 1.25rem; margin: 1.25rem 0; }
+  .steps li { margin-bottom: .5rem; }
   input { width: 100%; box-sizing: border-box; padding: .5rem; font: inherit; }
   button { margin-top: .75rem; padding: .5rem 1rem; font: inherit; }
+  label { font-weight: 600; }
+  .go {
+    background: #c4302b; color: #fff; border: 0; border-radius: .5rem;
+    font-weight: 600; cursor: pointer;
+  }
   .open {
     display: block; margin-top: 1rem; padding: 1rem;
     border-radius: .75rem; background: #c4302b; color: #fff;
@@ -24,26 +43,60 @@
     overflow-wrap: anywhere; padding: .75rem 1rem; border-radius: .5rem;
     background: #dbeafe; color: #1e293b;
   }
-  #bookmark-box a { color: #1d4ed8; }
+  #bookmark-box a { color: #1d4ed8; font-weight: 600; }
+  #bookmark-box p { margin: .25rem 0 0; font-size: .9rem; }
   .error { color: #c62828; }
+  footer {
+    margin: 2.5rem 0 2rem; padding-top: 1rem; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: .9rem; text-align: center;
+  }
   [hidden] { display: none; }
 </style>
 </head>
 <body>
+<header>
+  <img src="icon.svg" alt="" width="48" height="48">
+  <div>
+    <h1>Shufflemark</h1>
+    <p class="tagline">A bookmark that plays a random video from a playlist</p>
+  </div>
+</header>
+
 <p id="status">Loading…</p>
 
 <a id="open" class="open" hidden>Open in YouTube</a>
 
-<form id="list-form" hidden>
-  <label for="list">Playlist link or ID</label>
-  <input id="list" autocomplete="off" required
-    placeholder="Paste a YouTube playlist or video link">
-  <p id="hint" class="hint" hidden></p>
-  <p id="bookmark-box" hidden>
-    Bookmark this link to shuffle from this playlist in the future: <a id="bookmark"></a>
-  </p>
-  <button>Go</button>
-</form>
+<div id="setup" hidden>
+  <ol class="steps">
+    <li>Open your playlist on YouTube and copy its link from the address
+      bar (on the YouTube app: Share, then Copy link).</li>
+    <li>Paste the link in the box below.</li>
+    <li>A blue box will show your personal Shufflemark link. Bookmark it
+      (press Ctrl+D, or ⌘+D on a Mac; on a phone, use the browser's
+      Share or menu button and choose Add Bookmark).</li>
+    <li>Whenever you open that bookmark, a random video from your
+      playlist starts playing.</li>
+  </ol>
+
+  <form id="list-form">
+    <label for="list">YouTube playlist link</label>
+    <input id="list" autocomplete="off" required
+      placeholder="Paste a YouTube playlist or video link here">
+    <p id="hint" class="hint" hidden></p>
+    <div id="bookmark-box" hidden>
+      Your Shufflemark link — bookmark it to shuffle this playlist
+      any time: <a id="bookmark"></a>
+      <p>Tip: you can also drag this link onto your bookmarks bar.</p>
+    </div>
+    <button class="go">Play a random video now</button>
+  </form>
+</div>
+
+<footer>
+  Shufflemark is free and open source. Curious how it works, or want to
+  help improve it? Check out the code on
+  <a href="https://github.com/yunus-tuncbilek/shufflemark">GitHub</a>.
+</footer>
 
 <script>
 "use strict";
@@ -142,8 +195,8 @@ function bookmarkUrl(list) {
 }
 
 function setupForm() {
-  showStatus("Which playlist?");
-  $("list-form").hidden = false;
+  showStatus("Pick a playlist to shuffle.");
+  $("setup").hidden = false;
   $("list").focus();
 
   $("list").oninput = () => {
@@ -200,7 +253,7 @@ async function main() {
   // iOS and Android only open the YouTube app for a navigation the user
   // started with a tap, so mobile gets a button instead of a redirect.
   if (isMobile()) {
-    showStatus("Random video picked.");
+    showStatus("Shufflemark picked a random video for you.");
     $("open").href = url;
     $("open").hidden = false;
   } else {
