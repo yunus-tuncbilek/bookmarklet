@@ -95,7 +95,7 @@
 <footer>
   Shufflemark is free and open source. Curious how it works, or want to
   help improve it? Check out the code on
-  <a href="https://github.com/yunus-tuncbilek/shufflemark">GitHub</a>.
+  <a href="https://github.com/isatufan/shufflemark">GitHub</a>.
 </footer>
 
 <script>
@@ -145,6 +145,20 @@ function writeCache(list, ids) {
 
 class ApiError extends Error {
   constructor(message, reason) { super(message); this.reason = reason; }
+}
+
+async function fetchPlaylistTitle(list) {
+  const params = new URLSearchParams({
+    part: "snippet", id: list, key: API_KEY,
+  });
+  const res = await fetch(
+    "https://www.googleapis.com/youtube/v3/playlists?" + params);
+  const data = await res.json();
+  if (data.error) {
+    const reason = data.error.errors?.[0]?.reason ?? data.error.status;
+    throw new ApiError(data.error.message, reason);
+  }
+  return data.items?.[0]?.snippet?.title ?? null;
 }
 
 async function fetchPlaylist(list) {
@@ -223,12 +237,14 @@ async function main() {
   if (!list) return setupForm();
 
   let ids = readCache(list);
+  let playlistTitle = null;
   if (!ids) {
     if (API_KEY.startsWith("__")) {
       return showStatus("This site has no API key configured.", true);
     }
     try {
       ids = await fetchPlaylist(list);
+      playlistTitle = await fetchPlaylistTitle(list);
     } catch (err) {
       if (err instanceof ApiError && err.reason === "playlistNotFound") {
         return showStatus("Playlist not found. Check the ID, and make " +
@@ -244,20 +260,38 @@ async function main() {
       return showStatus("This playlist has no playable videos.", true);
     }
     writeCache(list, ids);
+  } else {
+    try {
+      playlistTitle = await fetchPlaylistTitle(list);
+    } catch {
+      playlistTitle = null;
+    }
   }
 
   const pick = ids[Math.floor(Math.random() * ids.length)];
   const url = `https://www.youtube.com/watch?v=${pick}` +
     `&list=${encodeURIComponent(list)}`;
 
+  const statusText = playlistTitle
+    ? `Shufflemark picked a random video from “${playlistTitle}”.`
+    : "Shufflemark picked a random video for you.";
+
+  document.title = playlistTitle
+    ? `Shufflemark – ${playlistTitle}`
+    : "Shufflemark";
+
   // iOS and Android only open the YouTube app for a navigation the user
   // started with a tap, so mobile gets a button instead of a redirect.
   if (isMobile()) {
-    showStatus("Shufflemark picked a random video for you.");
+    showStatus(statusText);
+    $("open").textContent = playlistTitle
+      ? `Open in YouTube — ${playlistTitle}`
+      : "Open in YouTube";
     $("open").href = url;
     $("open").hidden = false;
   } else {
-    location.replace(url);
+    showStatus(statusText);
+    setTimeout(() => location.replace(url), 1200);
   }
 }
 
