@@ -128,15 +128,15 @@ function readCache(list) {
   try {
     const cached = JSON.parse(localStorage.getItem("playlist:" + list));
     if (cached && Date.now() - cached.time < CACHE_TTL && cached.ids.length) {
-      return cached.ids;
+      return cached;
     }
   } catch {}
   return null;
 }
 
-function writeCache(list, ids) {
+function writeCache(list, ids, title) {
   try {
-    const value = JSON.stringify({ time: Date.now(), ids });
+    const value = JSON.stringify({ time: Date.now(), ids, title });
     localStorage.setItem("playlist:" + list, value);
   } catch {}
 }
@@ -236,8 +236,9 @@ async function main() {
   const list = new URLSearchParams(location.search).get("list");
   if (!list) return setupForm();
 
-  let ids = readCache(list);
-  let playlistTitle = null;
+  const cached = readCache(list);
+  let ids = cached?.ids;
+  let playlistTitle = cached?.title ?? null;
   if (!ids) {
     if (API_KEY.startsWith("__")) {
       return showStatus("This site has no API key configured.", true);
@@ -259,13 +260,13 @@ async function main() {
     if (!ids.length) {
       return showStatus("This playlist has no playable videos.", true);
     }
-    writeCache(list, ids);
-  } else {
+    writeCache(list, ids, playlistTitle);
+  } else if (!playlistTitle) {
+    // Entry cached before titles were stored; fetch it once and keep it.
     try {
       playlistTitle = await fetchPlaylistTitle(list);
-    } catch {
-      playlistTitle = null;
-    }
+      if (playlistTitle) writeCache(list, ids, playlistTitle);
+    } catch {}
   }
 
   const pick = ids[Math.floor(Math.random() * ids.length)];
