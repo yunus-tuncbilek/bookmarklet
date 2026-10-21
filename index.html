@@ -19,7 +19,11 @@
     text-decoration: none;
   }
   .hint { color: #c62828; margin: .5rem 0 0; }
-  #bookmark-box { overflow-wrap: anywhere; }
+  #bookmark-box {
+    overflow-wrap: anywhere; padding: .75rem 1rem; border-radius: .5rem;
+    background: #dbeafe; color: #1e293b;
+  }
+  #bookmark-box a { color: #1d4ed8; }
   .error { color: #c62828; }
   [hidden] { display: none; }
 </style>
@@ -35,7 +39,7 @@
     placeholder="Paste a YouTube playlist or video link">
   <p id="hint" class="hint" hidden></p>
   <p id="bookmark-box" hidden>
-    Bookmark this link: <a id="bookmark"></a>
+    Bookmark this link to shuffle from this playlist in the future: <a id="bookmark"></a>
   </p>
   <button>Go</button>
 </form>
