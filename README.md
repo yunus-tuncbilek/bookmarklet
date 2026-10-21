@@ -30,7 +30,7 @@ Visitors don't need their own API key. The site uses one shared key.
 - **Caching:** the video IDs are cached in `localStorage` for 24 hours, so most
   clicks don't call the API. Private and deleted videos are skipped.
 
-## Technical Details
+## Technical details
 
 ### Hosting setup
 
