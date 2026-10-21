@@ -7,7 +7,7 @@ source.
 
 ## How to use it (no technical skills needed)
 
-1. Open the Shufflemark page: https://yunus-tuncbilek.github.io/bookmarklet/
+1. Open the Shufflemark page: https://yunus-tuncbilek.github.io/shufflemark/
 2. In YouTube, open your playlist and copy its link from the address bar (in
    the YouTube app: Share, then Copy link).
 3. Paste the link into the box on the Shufflemark page. A blue box shows your
@@ -19,7 +19,7 @@ source.
 The bookmark looks like this, if you'd rather build it by hand:
 
 ```
-https://yunus-tuncbilek.github.io/bookmarklet/?list=<playlist id>
+https://yunus-tuncbilek.github.io/shufflemark/?list=<playlist id>
 ```
 
 Visitors don't need their own API key. The site uses one shared key.
@@ -30,7 +30,9 @@ Visitors don't need their own API key. The site uses one shared key.
 - **Caching:** the video IDs are cached in `localStorage` for 24 hours, so most
   clicks don't call the API. Private and deleted videos are skipped.
 
-## Hosting setup
+## Technical Details
+
+### Hosting setup
 
 The page is deployed by
 [`.github/workflows/pages.yml`](.github/workflows/pages.yml), which replaces
@@ -50,9 +52,10 @@ This is normal for browser API keys: the website restriction stops other sites
 from using it. The free quota is 10,000 units a day and a playlist costs one
 unit per 50 videos, so with the 24-hour cache it goes a long way.
 
-## Why an API key is required
+### Why an API key is required
 
-Opening a URL with a random index instead of a video ID doesn't work:
+Opening a YouTube URL with a playlist id and a random index doesn't launch 
+the video of the given index. For instance, something like this doesn't work:
 
 ```
 https://www.youtube.com/watch?list=<playlist id>&index=<n>
@@ -65,7 +68,7 @@ hand in a browser on 2026-10-18. A
 same behavior; YouTube has not documented it officially. So the page needs real
 video IDs, which it gets from the YouTube Data API.
 
-## Why mobile gets a button
+### Why mobile gets a button
 
 On iOS, a `youtube.com` link opens the YouTube app through Apple's *universal
 links*, but only when the user started the navigation by tapping something. A
