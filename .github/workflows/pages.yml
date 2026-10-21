@@ -1,0 +1,43 @@
+# Builds the site with the YouTube API key from the YT_API_KEY secret and
+# deploys it to GitHub Pages. Pages must use "GitHub Actions" as its source.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Insert API key
+        env:
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+        run: |
+          if [ -z "$YT_API_KEY" ]; then
+            echo "::error::The YT_API_KEY repository secret is not set."
+            exit 1
+          fi
+          mkdir _site
+          sed "s|__YT_API_KEY__|$YT_API_KEY|" index.html > _site/index.html
+          grep -q "$YT_API_KEY" _site/index.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+      - id: deployment
+        uses: actions/deploy-pages@v4

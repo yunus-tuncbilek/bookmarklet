@@ -6,9 +6,18 @@
 <title>Random Playlist Video</title>
 <style>
   :root { color-scheme: light dark; }
-  body { font: 16px/1.5 system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; padding: 0 1rem; }
+  body {
+    font: 16px/1.5 system-ui, sans-serif;
+    max-width: 32rem; margin: 3rem auto; padding: 0 1rem;
+  }
   input { width: 100%; box-sizing: border-box; padding: .5rem; font: inherit; }
   button { margin-top: .75rem; padding: .5rem 1rem; font: inherit; }
+  .open {
+    display: block; margin-top: 1rem; padding: 1rem;
+    border-radius: .75rem; background: #c4302b; color: #fff;
+    font-size: 1.25rem; font-weight: 600; text-align: center;
+    text-decoration: none;
+  }
   .error { color: #c62828; }
   [hidden] { display: none; }
 </style>
@@ -16,12 +25,7 @@
 <body>
 <p id="status">Loading…</p>
 
-<form id="key-form" hidden>
-  <label for="key">YouTube Data API key</label>
-  <input id="key" autocomplete="off" required>
-  <button>Save</button>
-  <p><small>Stored in a cookie in this browser only, for one year.</small></p>
-</form>
+<a id="open" class="open" hidden>Open in YouTube</a>
 
 <form id="list-form" hidden>
   <label for="list">Playlist ID</label>
@@ -32,8 +36,8 @@
 <script>
 "use strict";
 
-const KEY_COOKIE = "yt_api_key";
-const KEY_MAX_AGE = 60 * 60 * 24 * 365;  // seconds
+// Replaced with the real key by .github/workflows/pages.yml at deploy time.
+const API_KEY = "__YT_API_KEY__";
 const CACHE_TTL = 24 * 60 * 60 * 1000;   // ms
 
 const $ = (id) => document.getElementById(id);
@@ -43,35 +47,14 @@ function showStatus(text, isError = false) {
   $("status").className = isError ? "error" : "";
 }
 
-// --- API key cookie ---
+// Earlier versions stored the visitor's own key in this cookie.
+document.cookie = "yt_api_key=; max-age=0; SameSite=Strict; Secure";
 
-function getKey() {
-  const match = document.cookie.match(new RegExp("(?:^|; )" + KEY_COOKIE + "=([^;]*)"));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function saveKey(key) {
-  document.cookie = `${KEY_COOKIE}=${encodeURIComponent(key)}; max-age=${KEY_MAX_AGE}; SameSite=Strict; Secure`;
-}
-
-function clearKey() {
-  document.cookie = `${KEY_COOKIE}=; max-age=0; SameSite=Strict; Secure`;
-}
-
-function askForKey(message) {
-  return new Promise((resolve) => {
-    showStatus(message, message !== "Enter your API key to continue.");
-    $("key-form").hidden = false;
-    $("key").focus();
-    $("key-form").onsubmit = (e) => {
-      e.preventDefault();
-      const key = $("key").value.trim();
-      saveKey(key);
-      $("key-form").hidden = true;
-      showStatus("Loading…");
-      resolve(key);
-    };
-  });
+// Phones and tablets. iPadOS reports itself as a Mac, so check for touch.
+function isMobile() {
+  const ua = navigator.userAgent;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) ||
+    (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
 }
 
 // --- Playlist cache (per-browser convenience; works without it) ---
@@ -79,13 +62,18 @@ function askForKey(message) {
 function readCache(list) {
   try {
     const cached = JSON.parse(localStorage.getItem("playlist:" + list));
-    if (cached && Date.now() - cached.time < CACHE_TTL && cached.ids.length) return cached.ids;
+    if (cached && Date.now() - cached.time < CACHE_TTL && cached.ids.length) {
+      return cached.ids;
+    }
   } catch {}
   return null;
 }
 
 function writeCache(list, ids) {
-  try { localStorage.setItem("playlist:" + list, JSON.stringify({ time: Date.now(), ids })); } catch {}
+  try {
+    const value = JSON.stringify({ time: Date.now(), ids });
+    localStorage.setItem("playlist:" + list, value);
+  } catch {}
 }
 
 // --- YouTube Data API ---
@@ -94,31 +82,33 @@ class ApiError extends Error {
   constructor(message, reason) { super(message); this.reason = reason; }
 }
 
-async function fetchPlaylist(list, key) {
+async function fetchPlaylist(list) {
   const ids = [];
   let pageToken = "";
   do {
     const params = new URLSearchParams({
-      part: "contentDetails,status", playlistId: list, maxResults: "50", key,
+      part: "contentDetails,status", playlistId: list,
+      maxResults: "50", key: API_KEY,
     });
     if (pageToken) params.set("pageToken", pageToken);
-    const res = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?" + params);
+    const res = await fetch(
+      "https://www.googleapis.com/youtube/v3/playlistItems?" + params);
     const data = await res.json();
     if (data.error) {
-      throw new ApiError(data.error.message, data.error.errors?.[0]?.reason ?? data.error.status);
+      const reason = data.error.errors?.[0]?.reason ?? data.error.status;
+      throw new ApiError(data.error.message, reason);
     }
     for (const item of data.items) {
       const privacy = item.status?.privacyStatus;
       // Deleted videos show up as "privacyStatusUnspecified".
-      if (privacy === "public" || privacy === "unlisted") ids.push(item.contentDetails.videoId);
+      if (privacy === "public" || privacy === "unlisted") {
+        ids.push(item.contentDetails.videoId);
+      }
     }
     pageToken = data.nextPageToken ?? "";
   } while (pageToken);
   return ids;
 }
-
-// Errors that mean the stored key itself is bad, so we should ask for a new one.
-const KEY_ERRORS = ["keyInvalid", "badRequest", "forbidden", "ipRefererBlocked", "accessNotConfigured", "API_KEY_INVALID"];
 
 async function main() {
   const list = new URLSearchParams(location.search).get("list");
@@ -130,28 +120,42 @@ async function main() {
   }
 
   let ids = readCache(list);
-  let key = getKey() ?? await askForKey("Enter your API key to continue.");
-
-  while (!ids) {
+  if (!ids) {
+    if (API_KEY.startsWith("__")) {
+      return showStatus("This site has no API key configured.", true);
+    }
     try {
-      ids = await fetchPlaylist(list, key);
-      if (!ids.length) return showStatus("This playlist has no playable videos.", true);
-      writeCache(list, ids);
+      ids = await fetchPlaylist(list);
     } catch (err) {
       if (err instanceof ApiError && err.reason === "playlistNotFound") {
-        return showStatus("Playlist not found. Check the ID, and make sure it's public or unlisted.", true);
+        return showStatus("Playlist not found. Check the ID, and make " +
+          "sure it's public or unlisted.", true);
       }
-      if (err instanceof ApiError && KEY_ERRORS.includes(err.reason)) {
-        clearKey();
-        key = await askForKey(`The API key was rejected (${err.message}). Enter a valid key.`);
-        continue;
+      if (err instanceof ApiError && err.reason === "quotaExceeded") {
+        return showStatus("The site's daily YouTube quota is used up. " +
+          "Try again tomorrow.", true);
       }
       return showStatus("Couldn't load the playlist: " + err.message, true);
     }
+    if (!ids.length) {
+      return showStatus("This playlist has no playable videos.", true);
+    }
+    writeCache(list, ids);
   }
 
   const pick = ids[Math.floor(Math.random() * ids.length)];
-  location.replace(`https://www.youtube.com/watch?v=${pick}&list=${encodeURIComponent(list)}`);
+  const url = `https://www.youtube.com/watch?v=${pick}` +
+    `&list=${encodeURIComponent(list)}`;
+
+  // iOS and Android only open the YouTube app for a navigation the user
+  // started with a tap, so mobile gets a button instead of a redirect.
+  if (isMobile()) {
+    showStatus("Random video picked.");
+    $("open").href = url;
+    $("open").hidden = false;
+  } else {
+    location.replace(url);
+  }
 }
 
 main();
